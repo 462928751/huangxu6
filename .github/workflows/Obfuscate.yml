@@ -1,0 +1,57 @@
+name: Build Obfuscate BPB Panel
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 1 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          # 关键修复：移除缓存配置
+          # cache: 'npm'  # ❌ 删除此行
+
+      - name: Install obfuscator
+        run: |
+          # 添加 sudo 权限保证全局安装
+          sudo npm install -g javascript-obfuscator@latest
+          
+      - name: Download worker
+        run: |
+          curl -sS -L -o origin.js \
+            https://github.com/bia-pain-bache/BPB-Worker-Panel/releases/download/v3.2.2/worker.js
+          if [ ! -s origin.js ]; then
+            echo "❌ 文件下载失败！"
+            exit 1
+          fi
+
+      - name: Obfuscate code
+        run: |
+          javascript-obfuscator origin.js \
+            --output _worker.js \
+            --compact true \
+            --string-array true \
+            --string-array-threshold 0.75
+
+      - name: Commit changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: 'chore: Update obfuscated worker'
+          file_pattern: '_worker.js'
+          token: ${{ secrets.GITHUB_TOKEN }}
